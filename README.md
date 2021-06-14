@@ -1,50 +1,52 @@
 # terraform-google-gsa
 
-This module will create service accounts and IAM roles, accross any number of Google Cloud projects, based on the inputs passed through `var.config`.
+This module will create Google Service Accounts (GSA).
+For convenience, it also supports defining IAM roles for GCP Projects, and GCP Storage Buckets + GCP Secret Manager secrets in any GCP Project.
 
-The inputs must be structured correctly:
+The key idea behind bundling Service Account creation with common IAM resource roles, is to centralize the definition the GSA's IAM roles in one place (the place where the GSA itself is defined).
+Using this module for all GSA IAM role defintions is a counter-spaghetti pattern; it isolates the IAM permissions for a given GSA to a single location within the code.
 
 ```
 # Example:
-
-module "gsa" {
-  source = <path to this module>
-  config = yamldecode(<<-EOT
-    gsa-cnrm:
-      - type: project
-        name: bulder-sandbox-dev
-        roles:
-          - roles/iam.workloadIdentityUser
-          - roles/iam.serviceAccountAdmin
-          - roles/resourcemanager.projectIamAdmin
-      - type: project
-        name: terraform-admin-303613
-        roles:
-          - roles/resourcemanager.projectIamAdmin
-          - roles/secretmanager.admin
+locals {
+  example = yamldecode(<<-EOT
+    gha-k8s-deploy:
       - type: project
         name: bulder-sandbox-shared
         roles:
-          - roles/resourcemanager.projectIamAdmin
-          - roles/secretmanager.admin
-
-    gsa-gke:
+          - roles/cloudbuild.builds.builder
+          - roles/storage.objectViewer
+          - roles/viewer
       - type: project
         name: bulder-sandbox-dev
         roles:
-          - roles/storage.objectViewer
-          - roles/logging.logWriter
-          - roles/monitoring.metricWriter
-          - roles/cloudtrace.agent
-          - roles/compute.instanceAdmin.v1
-          - roles/iam.serviceAccountUser
-          - roles/stackdriver.resourceMetadata.writer
+          - roles/container.developer
       - type: bucket
         name: eu.artifacts.bulder-sandbox-shared.appspot.com
         roles:
-          - roles/storage.objectViewer
+          - roles/storage.objectAdmin
+      # Example: Secret in the same project as the GSA
+      - type: secret
+        name: secret-number-one
+        roles:
+          - roles/storage.objectAdmin
+      # Example: Secret in some other project
+      - type: secret
+        name: secret-number-two
+        project: bulder-yolo-swag
+        roles:
+          - roles/secretmanager.objectAdmin
   EOT
   )
+}
+
+module "gsa" {
+  source = <path to this module>
+  for_each = local.example
+  
+  account_id = each.key
+  project = "some-project"
+  iam_roles = each.value
 }
 ```
 

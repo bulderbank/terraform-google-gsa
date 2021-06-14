@@ -1,56 +1,73 @@
-variable "config" {
-  type = map(any)
+variable "account_id" {
+  type = string
+}
+variable "project" {
+  type    = string
+  default = ""
+}
+variable "iam_roles" {
+  type = any
+  # TODO: Use this instead when `optional()` is no longer experimental
+  # type = list(object({
+  #   role = string
+  #   type = string
+  #   name = string
+  #   project = optional(string) 
+  # })
 }
 
 locals {
-  # Transform inputs into a HCL map that can be used in `for_each` loops
-  gsa_iam_membership = {
-    for rule in flatten([
-      for key, val in var.config : [
-        for tpl in val : [
-          for role in tpl.roles :
-          {
-            gsa  = key
-            type = tpl.type
-            name = tpl.name
-            role = role
-          }
-        ]
+  # Convert `var.iam_roles` into a `for_each` map
+  iam_roles = {
+    for x in flatten([
+      for rule in var.iam_roles : [
+        for role in rule.roles : {
+          role    = role
+          type    = rule.type
+          name    = rule.name
+          project = lookup(rule, "project", var.project)
+        }
       ]
-    ]) : "${rule.gsa}-${rule.name}-${rule.role}" => rule
+    ]) : join("-", [x.type, x.name, x.role]) => x
   }
 }
 
 resource "google_service_account" "env" {
-  for_each   = var.config
-  account_id = each.key
+  account_id = var.account_id
+  project    = var.project
 }
 
 resource "google_project_iam_member" "env" {
   for_each = {
-    for k, v in local.gsa_iam_membership : k => v
+    for k, v in local.iam_roles : k => v
     if v.type == "project"
   }
-
   project = each.value.name
   role    = each.value.role
-  member  = "serviceAccount:${google_service_account.env[each.value.gsa].email}"
+  member  = "serviceAccount:${google_service_account.env.email}"
 }
 
 resource "google_storage_bucket_iam_member" "env" {
   for_each = {
-    for k, v in local.gsa_iam_membership : k => v
+    for k, v in local.iam_roles : k => v
     if v.type == "bucket"
   }
 
   bucket = each.value.name
   role   = each.value.role
-  member = "serviceAccount:${google_service_account.env[each.value.gsa].email}"
+  member = "serviceAccount:${google_service_account.env.email}"
 }
 
-output "emails" {
-  value = {
-    for gsa in google_service_account.env : gsa.account_id => gsa.email
+resource "google_secret_manager_secret_iam_member" "env" {
+  for_each = {
+    for k, v in local.iam_roles : k => v
+    if v.type == "secret"
   }
+
+
+  project   = each.value.project
+  secret_id = each.value.name
+  role      = each.value.role
+  member    = "serviceAccount:${google_service_account.env.email}"
 }
 
