@@ -65,9 +65,13 @@ resource "google_secret_manager_secret_iam_member" "env" {
   }
 
 
-  project   = each.value.project
+  project   = lookup(each.value, "project", "") != "" ? each.value.project : var.project
   secret_id = each.value.name
   role      = each.value.role
   member    = "serviceAccount:${google_service_account.env.email}"
+}
+
+output "email" {
+  value = google_service_account.env.email
 }
 
