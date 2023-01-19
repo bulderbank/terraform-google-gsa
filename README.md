@@ -1,3 +1,8 @@
+> Deprecated: Please use:
+> - https://github.com/bulderbank/terraform-google-iam
+> - https://github.com/bulderbank/terraform-google-service-account
+
+
 # terraform-google-gsa
 
 This module will create Google Service Accounts (GSA).

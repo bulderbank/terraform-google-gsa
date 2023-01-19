@@ -12,7 +12,7 @@ variable "iam_roles" {
   #   role = string
   #   type = string
   #   name = string
-  #   project = optional(string) 
+  #   project = optional(string)
   # })
 }
 
@@ -69,6 +69,17 @@ resource "google_secret_manager_secret_iam_member" "env" {
   secret_id = each.value.name
   role      = each.value.role
   member    = "serviceAccount:${google_service_account.env.email}"
+}
+
+resource "google_folder_iam_member" "env" {
+  for_each = {
+    for k, v in local.iam_roles : k => v
+    if v.type == "folder"
+  }
+
+  folder = each.value.name
+  role   = each.value.role
+  member = "serviceAccount:${google_service_account.env.email}"
 }
 
 output "email" {
