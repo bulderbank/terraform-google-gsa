@@ -41,6 +41,12 @@ locals {
         project: bulder-yolo-swag
         roles:
           - roles/secretmanager.objectAdmin
+      # Example: Impersonate service account in other project
+      - type: impersonation
+        name: some-service-account
+        project: different-project
+        roles:
+          - roles/placeholder.role # Hax to make GSA module apply the impersonation
   EOT
   )
 }
@@ -48,7 +54,7 @@ locals {
 module "gsa" {
   source = <path to this module>
   for_each = local.example
-  
+
   account_id = each.key
   project = "some-project"
   iam_roles = each.value
