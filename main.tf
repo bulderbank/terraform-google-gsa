@@ -82,6 +82,17 @@ resource "google_folder_iam_member" "env" {
   member = "serviceAccount:${google_service_account.env.email}"
 }
 
+resource "google_service_account_iam_binding" "env" {
+  for_each = {
+    for k, v in local.iam_roles : k => v
+    if v.type == "impersonation"
+  }
+
+  service_account_id = "projects/${each.value.project}/serviceAccounts/${each.value.name}@${each.value.project}.iam.gserviceaccount.com"
+  role               = "roles/iam.serviceAccountTokenCreator"
+  members            = ["serviceAccount:${google_service_account.env.email}"]
+}
+
 output "email" {
   value = google_service_account.env.email
 }
