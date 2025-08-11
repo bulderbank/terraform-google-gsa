@@ -47,6 +47,16 @@ resource "google_project_iam_member" "env" {
   member  = "serviceAccount:${google_service_account.env.email}"
 }
 
+resource "google_organization_iam_member" "env" {
+  for_each = {
+    for k, v in local.iam_roles : k => v
+    if v.type == "organization"
+  }
+  org_id = each.value.name
+  role   = each.value.role
+  member = "serviceAccount:${google_service_account.env.email}"
+}
+
 resource "google_storage_bucket_iam_member" "env" {
   for_each = {
     for k, v in local.iam_roles : k => v
